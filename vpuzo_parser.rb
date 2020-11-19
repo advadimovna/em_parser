@@ -19,7 +19,7 @@ urls = []
   url = "#{start_page}/page/#{p.to_s}/"
   urls << url
 end
-concurrency = 50
+concurrency = 32
 items = []
 EM.run do
   EM::Iterator.new(urls, concurrency).each(
@@ -95,10 +95,10 @@ db.transaction do |db|
   db.execute("CREATE TABLE IF NOT EXISTS authors (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name text, rating float,
                 link text, created_at datetime, updated_at datetime)")
   db.execute("CREATE TABLE IF NOT EXISTS recipes_natural (id INTEGER PRIMARY KEY NOT NULL, name text, author text, image text,
-                cook_time text, geography text, main_ingredient text, type text, link text,
+                cook_time text, geography text, main_ingredient text, dish_type text, link text,
                 created_at datetime, updated_at datetime)")
   db.execute("CREATE TABLE IF NOT EXISTS recipes (id INTEGER PRIMARY KEY NOT NULL, name text, author_id integer, image text,
-                cook_time text, geography text, main_ingredient text, type text, link text,
+                cook_time text, geography text, main_ingredient text, dish_type text, link text,
                 created_at datetime, updated_at datetime, FOREIGN KEY (author_id) REFERENCES authors(id))")
   db.execute("DELETE FROM authors;
               DELETE FROM recipes_natural")
@@ -110,13 +110,14 @@ db.transaction do |db|
                author[:author], author[:author_rating], author[:author_link])
   end
   recipes.each do |recipe|
-    db.execute("INSERT INTO recipes_natural (name, image, author, cook_time, geography, main_ingredient, type, link, created_at)
+    db.execute("INSERT INTO recipes_natural (name, image, author, cook_time, geography, main_ingredient, dish_type, link, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, DATETIME('now'))",
                recipe[:name], recipe[:image], recipe[:author], recipe[:cook_time], recipe[:geography],
                recipe[:main_ingredient], recipe[:type], recipe[:link],)
   end
-  db.execute("INSERT INTO recipes (id, name, image, author_id, cook_time, geography, main_ingredient, type, link, created_at)
-              SELECT recipes_natural.id, recipes_natural.name, image, authors.id, cook_time, geography, main_ingredient, type, recipes_natural.link, recipes_natural.created_at
+  db.execute("INSERT INTO recipes (id, name, image, author_id, cook_time, geography, main_ingredient, dish_type, link, created_at)
+              SELECT recipes_natural.id, recipes_natural.name, image, authors.id, cook_time, geography, main_ingredient, dish_type,
+              recipes_natural.link, recipes_natural.created_at
               FROM recipes_natural INNER JOIN authors WHERE authors.name=recipes_natural.author")
   db.execute("DROP TABLE recipes_natural")
   # db.execute("ALTER TABLE recipes ADD COLUMN author_id integer REFERENCES authors(id)")
