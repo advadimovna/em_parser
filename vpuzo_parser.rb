@@ -15,7 +15,8 @@ parsed_start_page=Nokogiri::HTML(open(start_page))
 pages_count=parsed_start_page.css('li:nth-child(6) .b3').text.to_i
 puts "Finded #{pages_count} pages"
 urls = []
-(1..500).each do |p|
+urls << start_page
+(2..500).each do |p|
   url = "#{start_page}/page/#{p.to_s}/"
   urls << url
 end
@@ -24,7 +25,7 @@ items = []
 EM.run do
   EM::Iterator.new(urls, concurrency).each(
       proc { |url, iter|
-        http = EventMachine::HttpRequest.new(url, ssl: {verify_peer: false}, :connect_timeout => 10).get
+        http = EventMachine::HttpRequest.new(url, ssl: {verify_peer: false}, :connect_timeout => 20).get
         http.callback do |response|
           document = Nokogiri::HTML(response.response)
           document.xpath('//*/div[@class="catalog-box"]/a/@href').each do |item|
@@ -52,7 +53,7 @@ recipes = []
 EM.run do
   EM::Iterator.new(item_links, concurrency).each(
       proc { |url, iter|
-        http = EventMachine::HttpRequest.new(url, ssl: {verify_peer: false}, :connect_timeout => 20).get
+        http = EventMachine::HttpRequest.new(url, ssl: {verify_peer: false}, :connect_timeout => 30).get
         http.callback do |response|
           document = Nokogiri::HTML(response.response)
           recipe = {
@@ -90,7 +91,8 @@ end
 puts "Time for downloading and parsing #{(t - Time.now).abs.round(2)} sec"
 t = Time.now
 puts "Writing in db"
-db = SQLite3::Database.open("recipes.db")
+SQLite3::Database.new("recipes_for_rails.db")
+db=SQLite3::Database.open("recipes_for_rails.db")
 db.transaction do |db|
   db.execute("CREATE TABLE IF NOT EXISTS authors (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name text, rating float,
                 link text, created_at datetime, updated_at datetime)")
@@ -100,6 +102,7 @@ db.transaction do |db|
   db.execute("CREATE TABLE IF NOT EXISTS recipes (id INTEGER PRIMARY KEY NOT NULL, name text, author_id integer, image text,
                 cook_time text, geography text, main_ingredient text, dish_type text, link text,
                 created_at datetime, updated_at datetime, FOREIGN KEY (author_id) REFERENCES authors(id))")
+  db.execute("CREATE INDEX IF NOT EXISTS author_id_index ON recipes(author_id)")
   db.execute("DELETE FROM authors;
               DELETE FROM recipes_natural")
   db.execute("DELETE FROM recipes")
@@ -120,13 +123,8 @@ db.transaction do |db|
               recipes_natural.link, recipes_natural.created_at
               FROM recipes_natural INNER JOIN authors WHERE authors.name=recipes_natural.author")
   db.execute("DROP TABLE recipes_natural")
-  # db.execute("ALTER TABLE recipes ADD COLUMN author_id integer REFERENCES authors(id)")
-  # db.execute("UPDATE recipes SET author_id = (SELECT authors.id FROM authors WHERE authors.name=recipes.author) WHERE author_id IS NULL")
-  # db.execute("ALTER TABLE recipes ADD CONSTRAINT author_fk FOREIGN KEY (author_id) REFERENCES authors(id)")
 end
 db.close
 puts "DB done!"
 puts "Time for db inserting #{(t - Time.now).abs.round(2)} sec"
 
-#rails generate scaffold Author name:string rating:float link:string
-#rails generate scaffold Recipe name:string author:string image:string cook_time:string geography:string main_ingredient:string type:string link:string
